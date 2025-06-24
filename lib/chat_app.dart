@@ -8,6 +8,12 @@ class FirebaseChatApp {
 
   String? idToken;
   String? userEmail;
+  String? userUid;
+
+  String getChatId(String user1, String user2){
+    final users = [user1, user2]..sort();
+    return '${users[0]}_${users[1]}'.replaceAll('@', '_').replaceAll('.', '_');
+  }
 
   Future<bool> signUp(String email, String password) async {
     final url = Uri.parse('$authBaseUrl:signUp?key=$apiKey');
@@ -50,6 +56,7 @@ class FirebaseChatApp {
       if(response.statusCode == 200){
         idToken = data['idToken'];
         userEmail = email;
+        userUid = data['localId'];
         print("\nLogin Successful! Welcome $userEmail");
         return true;
       } else {
@@ -63,26 +70,30 @@ class FirebaseChatApp {
     }
   }
 
-  Future<bool> sendMessage(String message) async {
+  Future<bool> sendMessage(String recipientEmail, String message) async {
     if(idToken == null){
       print("\nPlease log in to send a message.");
       return false;
     }
+    final chatId = getChatId(userEmail!, recipientEmail);
     final url = Uri.parse('$databaseUrl/chats/room1/messages.json?auth=$idToken');
     try{
       final response = await http.post(
         url,
         body: jsonEncode({
-        'user': userEmail,
+        'sender': userEmail,
+        'receiver': recipientEmail,
         'message': message,
         'timestamp': DateTime.now().toIso8601String(),
-      }),
+        }),
       );
       if(response.statusCode == 200 || response.statusCode == 201){
-        print("\nMessage sent successfully!");
+        print("\nMessage sent successfully sent to $recipientEmail");
+        await fetchMessages(recipientEmail);
         return true;
       } else {
         print("\nFailed to send message! ${response.statusCode}");
+        await fetchMessages(recipientEmail);
         return false;
       }
     }
@@ -92,7 +103,13 @@ class FirebaseChatApp {
     }
   }
 
-  Future<void> fetchMessages() async {
+  Future<void> fetchMessages(String recipientEmail) async {
+    if(idToken == null || userEmail == null || userUid == null){
+      print("Please log in to fetch messages!");
+      return;
+    }
+
+    final chatId = getChatId(userEmail!, recipientEmail);
     final url = Uri.parse('$databaseUrl/chats/room1/messages.json?auth=$idToken');
     try {
       final response = await http.get(url);
@@ -117,6 +134,7 @@ class FirebaseChatApp {
   void logout(){
     idToken = null;
     userEmail = null;
+    userUid = null;
     print("\nYou've successfully logged out.");
   }
 }

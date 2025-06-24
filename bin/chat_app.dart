@@ -13,6 +13,7 @@ void main() async {
 
       String? input = stdin.readLineSync();
       if(input == null) continue;
+
       if(input == '1'){
         stdout.write("Enter your email: ");
         final email = stdin.readLineSync();
@@ -26,6 +27,7 @@ void main() async {
           print("Please enter your password to continue.");
           continue;
         }
+        
         await chatApp.signUp(email, password);
       } else if( input == '2'){
         stdout.write("Enter your email: ");
@@ -50,23 +52,29 @@ void main() async {
     } else {
       print("\n---------- CHAT ROOM ----------");
       print("You're signed in as ${chatApp.userEmail}\n");
-      print("1. Send Message");
-      print("2. Fetch Messages");
-      print("3. Exit");
+      print("1. Send a Message");
+      print("2. Logout\n");
       
       final input = stdin.readLineSync();
 
       if(input == '1'){
+        stdout.write("Enter recipient's email: ");
+        final recipient = stdin.readLineSync();
+        if(recipient == null || recipient.isEmpty){
+          print("Recipient email cannot be empty!");
+          continue;
+        }
+
+        await chatApp.fetchMessages(recipient);
         stdout.write("Enter your message:\n\n");
         final message = stdin.readLineSync();
         if(message != null && message.isNotEmpty){
-          await chatApp.sendMessage(message);
+          await chatApp.sendMessage(recipient, message);
         } else {
           print("Message cannot be empty. Please try again.");
+          continue;
         }
       } else if(input == '2'){
-        await chatApp.fetchMessages();
-      } else if(input == '3'){
         chatApp.logout();
       } else {
         print("Invalid option! Please try again.");
