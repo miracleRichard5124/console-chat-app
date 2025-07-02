@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
@@ -6,6 +7,8 @@ class FirebaseChatApp {
   static const String databaseUrl = "https://console-chat-app-419ed-default-rtdb.firebaseio.com";
   static const String authBaseUrl = 'https://identitytoolkit.googleapis.com/v1/accounts';
 
+  Timer? messagePollingTimer;
+  String? lastMessageTimestamp;
   String? idToken;
   String? userEmail;
   String? userUid;
@@ -76,7 +79,7 @@ class FirebaseChatApp {
       return false;
     }
     final chatId = getChatId(userEmail!, recipientEmail);
-    final url = Uri.parse('$databaseUrl/chats/room1/messages.json?auth=$idToken');
+    final url = Uri.parse('$databaseUrl/chats/$chatId/messages.json?auth=$idToken');
     try{
       final response = await http.post(
         url,
@@ -88,8 +91,7 @@ class FirebaseChatApp {
         }),
       );
       if(response.statusCode == 200 || response.statusCode == 201){
-        print("\nMessage sent successfully sent to $recipientEmail");
-        await fetchMessages(recipientEmail);
+        print("\nMessage successfully sent to $recipientEmail");
         return true;
       } else {
         print("\nFailed to send message! ${response.statusCode}");
@@ -110,16 +112,26 @@ class FirebaseChatApp {
     }
 
     final chatId = getChatId(userEmail!, recipientEmail);
-    final url = Uri.parse('$databaseUrl/chats/room1/messages.json?auth=$idToken');
+    final url = Uri.parse('$databaseUrl/chats/$chatId/messages.json?auth=$idToken');
     try {
       final response = await http.get(url);
       if(response.statusCode == 200){
         final data = jsonDecode(response.body);
         if(data != null){
           print('\n---------- Chat Messages ----------\n');
-          data.forEach((key, value) {
-            print("[${value['timestamp']}] ${value['user']}: $value['message']");
+          List<MapEntry<String, dynamic>> messages = data.entries.toList()..sort((a, b) {
+            final timeStampA = a.value['timestamp'] as String;
+            final timeStampB = b.value['timestamp'] as String;
+            return timeStampA.compareTo(timeStampB); 
           });
+
+          for (var msg in messages){
+            final timestamp = msg.value['timestamp'] as String;
+            if(lastMessageTimestamp == null || timestamp.compareTo(lastMessageTimestamp!) > 0){
+              print("[$timestamp] ${msg.value['sender']}: ${msg.value['message']}");
+              lastMessageTimestamp = timestamp;
+            }
+          }
         } else {
           print("No messages found.");
         }
@@ -129,6 +141,14 @@ class FirebaseChatApp {
     } catch (e) {
       print("error: $e");
     }
+  }
+
+  void startChatPolling(FirebaseChatApp chatApp, String recipientEmail){
+    chatApp.messagePollingTimer?.cancel();
+
+    chatApp.messagePollingTimer = Timer.periodic(Duration(seconds: 2), (_) async {
+      await chatApp.fetchMessages(recipientEmail);
+    });
   }
 
   void logout(){
