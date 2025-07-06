@@ -106,6 +106,40 @@ class FirebaseChatApp {
     }
   }
 
+  Future<bool> checkEmailExists(String recipientEmail) async {
+    if(idToken == null){
+      print('\nPlease log in to checkEmail!');
+      return false;
+    }
+
+    final userCheckUrl = Uri.parse('$databaseUrl/users.json?auth=$idToken');
+    try{
+      final userCheckResponse = await http.get(userCheckUrl);
+      if(userCheckResponse.statusCode == 200){
+        final usersData = jsonDecode(userCheckResponse.body);
+        bool userExists = false;
+        if(usersData != null){
+          usersData.forEach((key, value) {
+            if(value['email'] == recipientEmail){
+              userExists = true;
+            }
+          });
+        }
+        if(!userExists){
+          print("\nError: Recipient email '$recipientEmail' does not exist in the database.");
+          return false;
+        }
+        return true;
+      } else {
+        print("\nFailed to verify recipient email: ${userCheckResponse.statusCode}");
+        return false;
+      }
+    } catch(e){
+      print("\nError verifying recipient's email: $e");
+      return false;
+    }
+  }
+
   Future<void> fetchMessages(String recipientEmail) async {
     if (idToken == null || userEmail == null || userUid == null) {
       print("Please log in to fetch messages!");
@@ -129,22 +163,29 @@ class FirebaseChatApp {
               });
 
           if (messages.isNotEmpty) {
-            print('\n---------- Chat Messages ----------\n');
+            bool hasNewMessages = false;
             for (var msg in messages) {
               final timestamp = msg.value['timestamp'] as String;
               if (lastMessageTimestamp == null ||
                   timestamp.compareTo(lastMessageTimestamp!) > 0) {
+                if (!hasNewMessages) {
+                  print('\n---------- Chat Messages ----------\n');
+                  hasNewMessages = true;
+                }
                 print(
-                  "[$timestamp] ${msg.value['sender']}: ${msg.value['message']}",
+                  "[$timestamp]\n${msg.value['sender']}==> ${msg.value['message']}",
                 );
                 lastMessageTimestamp = timestamp;
               }
             }
-          } else{
-            print('No new Messages.');
+            if(!hasNewMessages){
+              print("\nNo new Messages.");
+            }
+          } else {
+            print('\nNo new Messages found.');
           }
         } else {
-          print("No messages found.");
+          print("\nNo messages found.");
         }
       } else {
         print("Failed to fetch messages! ${response.statusCode}");
@@ -156,9 +197,8 @@ class FirebaseChatApp {
 
   void startChatPolling(FirebaseChatApp chatApp, String recipientEmail) {
     messagePollingTimer?.cancel();
-    messagePollingTimer = Timer.periodic(Duration(seconds: 2), (
-      _,
-    ) async {
+    lastMessageTimestamp = null;
+    messagePollingTimer = Timer.periodic(Duration(seconds: 3), (_) async {
       await chatApp.fetchMessages(recipientEmail);
     });
   }

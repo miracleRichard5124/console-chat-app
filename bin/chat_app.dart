@@ -73,25 +73,26 @@ void main() async {
             continue;
           }
 
-          chatApp.startChatPolling(chatApp, recipient);
-          print(
-            'Chatting with $recipient... Type "exit" to exit this chat room.\n',
-          );
-
-          while (true) {
-            stdout.write(
-              "Enter your message (or 'exit' to exit the chat room):\n\n",
+          if (await chatApp.checkEmailExists(recipient)) {
+            chatApp.startChatPolling(chatApp, recipient);
+            print(
+              'Chatting with $recipient... Type "exit" to exit this chat room.\n',
             );
-            final message = stdin.readLineSync()?.trim();
-            if (message == null || message.isEmpty) {
-              print('Message cannot be empty!!! Please Enter your message:');
-              continue;
-            }
-            if (message.toLowerCase() == 'exit') {
-              chatApp.messagePollingTimer?.cancel();
-              break;
-            } else {
-              await chatApp.sendMessage(recipient, message);
+            while (true) {
+              stdout.write(
+                "Enter your message (or 'exit' to exit the chat room):\n\n",
+              );
+              final message = stdin.readLineSync()?.trim();
+              if (message == null || message.isEmpty) {
+                print('Message cannot be empty!!! Please Enter your message:');
+                continue;
+              }
+              if (message.toLowerCase() == 'exit') {
+                chatApp.messagePollingTimer?.cancel();
+                break;
+              } else {
+                await chatApp.sendMessage(recipient, message);
+              }
             }
           }
         } else if (input == '2') {
